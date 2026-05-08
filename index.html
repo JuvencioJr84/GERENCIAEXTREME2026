@@ -1,0 +1,1326 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Magnetic Estúdio - Controle de Tempos Online</title>
+    
+    <!-- Bibliotecas para geração de PDF -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
+    <!-- Bibliotecas do Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    
+    <style>
+        :root {
+            --bg-dark: #121212;
+            --bg-panel: #1e1e1e;
+            --primary: #00ff88;
+            --primary-hover: #00cc6a;
+            --danger: #ff4444;
+            --danger-hover: #cc0000;
+            --warning: #ff9800;
+            --warning-hover: #e68a00;
+            --info: #2196f3;
+            --info-hover: #0b7dda;
+            --special: #9c27b0;
+            --special-hover: #7b1fa2;
+            --edit: #3f51b5;
+            --edit-hover: #303f9f;
+            --text-light: #ffffff;
+            --text-muted: #aaaaaa;
+            --border: #333333;
+        }
+
+        * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        body { 
+            background-color: var(--bg-dark); 
+            color: var(--text-light); 
+            margin: 0; 
+            padding: 0; 
+            min-height: 100vh;
+        }
+
+        /* ================= TELA DE LOGIN EXTREME ================= */
+        #tela-login-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            width: 100vw;
+            background: radial-gradient(circle, #1a1a1a 0%, #000000 100%);
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 9999;
+        }
+
+        .login-box {
+            background: #1e1e1e;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 255, 136, 0.4);
+            text-align: center;
+            width: 320px;
+            border-top: 4px solid var(--primary);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .login-box h1 {
+            color: var(--primary);
+            margin-top: 15px;
+            margin-bottom: 0;
+            letter-spacing: 3px;
+            font-style: italic;
+            text-transform: uppercase;
+            font-size: 1.8rem;
+        }
+
+        .login-box input {
+            width: 100%;
+            padding: 15px;
+            margin: 20px 0;
+            border: 1px solid var(--border);
+            border-radius: 5px;
+            background: #2a2a2a;
+            color: #fff;
+            font-size: 18px;
+            text-align: center;
+            font-weight: bold;
+        }
+
+        .login-box button {
+            width: 100%;
+            padding: 15px;
+            background: var(--primary);
+            color: var(--bg-dark);
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+            text-transform: uppercase;
+        }
+
+        .login-box button:hover { background: var(--primary-hover); }
+
+        /* ================= SISTEMA PRINCIPAL ================= */
+        #sistema-principal {
+            display: none;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        header {
+            background-color: var(--bg-panel);
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid var(--primary);
+        }
+
+        .header-left { display: flex; flex-direction: column; flex: 1; }
+
+        h1 { margin: 0 0 5px 0; color: var(--primary); text-transform: uppercase; letter-spacing: 2px; font-size: 1.5rem; text-align: left; }
+        
+        .operador-display {
+            font-size: 0.9rem;
+            color: var(--info);
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-logout {
+            background: transparent;
+            color: var(--danger);
+            border: 1px solid var(--danger);
+            padding: 2px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            transition: 0.2s;
+        }
+
+        .btn-logout:hover { background: var(--danger); color: white; }
+
+        .status-online {
+            display: flex; align-items: center; gap: 8px; color: var(--primary); font-weight: bold; font-size: 0.9rem; margin-right: 20px;
+        }
+        
+        .dot {
+            height: 12px; width: 12px; background-color: var(--primary); border-radius: 50%; display: inline-block;
+            box-shadow: 0 0 8px var(--primary); animation: pulse 1.5s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(0, 255, 136, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 255, 136, 0); }
+        }
+
+        .nav-tabs { display: flex; gap: 10px; padding: 15px 20px; background: var(--bg-dark); border-bottom: 1px solid var(--border); }
+        .tab-btn { background: var(--bg-panel); color: var(--text-light); border: 1px solid var(--border); padding: 10px 20px; cursor: pointer; font-weight: bold; border-radius: 5px 5px 0 0; transition: all 0.3s; }
+        .tab-btn.active, .tab-btn:hover { background: var(--primary); color: var(--bg-dark); border-color: var(--primary); }
+        .tab-content { display: none; padding: 20px; flex: 1; }
+        .tab-content.active { display: block; }
+
+        .card { background: var(--bg-panel); padding: 20px; border-radius: 8px; margin-bottom: 20px; border: 1px solid var(--border); }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; color: var(--text-muted); }
+        input, select { width: 100%; padding: 10px; background: var(--bg-dark); border: 1px solid var(--border); color: white; border-radius: 4px; }
+        input[type="file"] { padding: 5px; background: var(--bg-panel); }
+        
+        button { padding: 10px 15px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; background: var(--primary); color: var(--bg-dark); transition: 0.2s; }
+        button:hover { background: var(--primary-hover); }
+        button.btn-danger { background: var(--danger); color: white; }
+        button.btn-danger:hover { background: var(--danger-hover); }
+        button.btn-warning { background: var(--warning); color: white; }
+        button.btn-warning:hover { background: var(--warning-hover); }
+        button.btn-info { background: var(--info); color: white; }
+        button.btn-info:hover { background: var(--info-hover); }
+        button.btn-special { background: var(--special); color: white; }
+        button.btn-special:hover { background: var(--special-hover); }
+        button.btn-edit { background: var(--edit); color: white; }
+        button.btn-edit:hover { background: var(--edit-hover); }
+        button:disabled { background: var(--border); color: var(--text-muted); cursor: not-allowed; box-shadow: none; }
+
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: rgba(255,255,255,0.05); color: var(--primary); }
+        
+        .text-danger { color: var(--danger) !important; }
+        .text-especial { color: var(--danger) !important; font-weight: bold; }
+        
+        .relogio-container { text-align: center; font-size: 4rem; font-weight: bold; color: var(--primary); margin-bottom: 30px; font-family: monospace; text-shadow: 0 0 10px rgba(0, 255, 136, 0.3); }
+        .largada-grid { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 30px; justify-content: center; }
+        .equipe-card { background: var(--bg-dark); border: 2px solid var(--border); padding: 15px; border-radius: 8px; text-align: center; width: 200px; }
+        .equipe-card h2 { margin: 0 0 10px 0; color: white; font-size: 1.5rem; }
+        .equipe-card p { margin: 0 0 5px 0; color: var(--text-muted); }
+        .equipe-card .cat-label { font-size: 0.8rem; color: var(--primary); margin-bottom: 15px; display: block;}
+
+        .btn-grande { width: 100%; font-size: 1.5rem; padding: 20px; text-transform: uppercase; letter-spacing: 2px; box-shadow: 0 4px 15px rgba(0, 255, 136, 0.4); margin-bottom: 30px; }
+        .chegada-box { display: flex; gap: 10px; align-items: flex-end; background: rgba(0,0,0,0.2); padding: 20px; border-radius: 8px; border: 1px solid var(--border); }
+        .chegada-box .form-group { margin: 0; flex: 1; }
+        .backup-controls { display: flex; gap: 10px; justify-content: flex-end; }
+        .acoes-relatorio, .acoes-tabela { display: flex; gap: 5px; flex-wrap: wrap; }
+
+        .site-footer { text-align: center; padding: 15px; font-size: 0.8rem; color: var(--text-muted); background-color: var(--bg-panel); border-top: 1px solid var(--border); margin-top: auto; }
+        .search-container { flex: 1; min-width: 200px; max-width: 400px; margin: 0 15px; }
+        .search-container input { margin: 0; border: 1px solid var(--primary); }
+        .categoria-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; background: rgba(0,0,0,0.2); border: 1px solid var(--border); border-radius: 4px; margin-bottom: 5px; }
+    </style>
+</head>
+<body>
+
+    <!-- ================= TELA DE LOGIN ================= -->
+    <div id="tela-login-container">
+        <div class="login-box">
+            <div id="login-logo-container" style="display: none; width: 100%; text-align: center;">
+                <img id="login-logo" src="" alt="Logo do Evento" style="max-width: 200px; max-height: 150px; border-radius: 8px; object-fit: contain;">
+            </div>
+            <h1>LOGIN EXTREME</h1>
+            <input type="password" id="input-codigo-login" placeholder="Código do Operador" autocomplete="off" onkeypress="verificarEnterLogin(event)">
+            <button onclick="efetuarLogin()">Acessar Sistema</button>
+        </div>
+    </div>
+
+    <!-- ================= SISTEMA PRINCIPAL ================= -->
+    <div id="sistema-principal">
+        <header>
+            <div style="display: flex; align-items: center; gap: 20px;">
+                <div id="header-logo-container" style="display: none;">
+                    <img id="header-logo" src="" alt="Logo" style="max-height: 60px; max-width: 150px; border-radius: 5px; object-fit: contain;">
+                </div>
+                <div class="header-left">
+                    <h1 id="main-title">Controle de Tempos</h1>
+                    <div class="operador-display" id="display-operador">
+                        <span id="nome-operador-header">Operador: Não definido</span>
+                        <button class="btn-logout" onclick="fazerLogout()" style="display: none;" id="btn-logout-header">Sair da Sessão</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="display: flex; align-items: center;">
+                <div class="status-online" id="status-db">
+                    <span class="dot" style="background-color: var(--danger); box-shadow: none;"></span> Desconectado
+                </div>
+                <div class="backup-controls">
+                    <button onclick="exportarBackup()">Salvar Backup Local</button>
+                </div>
+            </div>
+        </header>
+
+        <div class="nav-tabs">
+            <button class="tab-btn active" onclick="abrirGuia(event, 'guia-evento')">Evento (Configurações)</button>
+            <button class="tab-btn" onclick="abrirGuia(event, 'guia-cadastro')">Cadastro de Equipes</button>
+            <button class="tab-btn" onclick="abrirGuia(event, 'guia-telao')">Telão da Prova</button>
+            <button class="tab-btn" onclick="abrirGuia(event, 'guia-relatorio')">Relatório Oficial</button>
+        </div>
+
+        <!-- GUIA EVENTO -->
+        <div id="guia-evento" class="tab-content active">
+            
+            <!-- CARD OPERADORES -->
+            <div class="card">
+                <h2>Gerenciar Operadores</h2>
+                <input type="hidden" id="op-id">
+                <div class="form-group" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 200px;">
+                        <label>Nome do Operador</label>
+                        <input type="text" id="op-nome" placeholder="Ex: Juvencio Jr">
+                    </div>
+                    <div style="flex: 1; min-width: 200px;">
+                        <label>Código do Operador</label>
+                        <input type="text" id="op-codigo" placeholder="Ex: OP-001">
+                    </div>
+                </div>
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button id="btn-salvar-op" onclick="salvarOperador()">Salvar Operador</button>
+                    <button id="btn-cancelar-op" onclick="limparFormOperador()" style="display:none; background:var(--text-muted);">Cancelar</button>
+                </div>
+                
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Nome</th>
+                                <th>Código</th>
+                                <th>Status de Sessão</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-operadores"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- CARD EVENTO -->
+            <div class="card">
+                <h2>Configurações do Evento</h2>
+                <div class="form-group">
+                    <label>Nome do Evento</label>
+                    <input type="text" id="evt-nome" placeholder="Ex: II Corrida Pedestre Glória do Solimões">
+                </div>
+                <div class="form-group">
+                    <label>Quantidade de Equipes por Largada</label>
+                    <input type="number" id="evt-qtd" min="1" value="5">
+                </div>
+                <div class="form-group">
+                    <label>Horário de Início do Evento (HH:MM)</label>
+                    <input type="time" id="evt-hora" value="08:00">
+                </div>
+                <div class="form-group">
+                    <label>Intervalo de Largadas (Minutos)</label>
+                    <input type="number" id="evt-intervalo" min="1" value="5">
+                </div>
+                <div class="form-group" style="border-top: 1px solid var(--border); padding-top: 15px; margin-top: 15px;">
+                    <label style="color: var(--special); font-weight: bold;">Horário da Largada Especial (HH:MM)</label>
+                    <input type="time" id="evt-hora-especial" value="07:30">
+                </div>
+                
+                <!-- NOVO: LOGOMARCA DO EVENTO -->
+                <div class="form-group" style="border-top: 1px solid var(--border); padding-top: 15px; margin-top: 15px;">
+                    <label style="color: var(--primary); font-weight: bold; margin-bottom: 10px;">Logomarca do Evento (Até 2MB)</label>
+                    <input type="file" id="evt-logo-upload" accept="image/*" onchange="processarLogoUpload(event)">
+                    <br>
+                    <button onclick="removerLogo()" class="btn-danger" style="margin-top: 15px; display: none;" id="btn-remover-logo">Remover Logomarca</button>
+                </div>
+
+                <button onclick="salvarEvento()" style="width: 100%; font-size: 1.1rem; padding: 15px; margin-top: 10px;">Salvar Configurações da Prova</button>
+            </div>
+
+            <!-- CARD CATEGORIAS -->
+            <div class="card">
+                <h2>Categorias da Prova</h2>
+                <div class="form-group" style="display: flex; gap: 10px;">
+                    <input type="text" id="evt-nova-categoria" placeholder="Ex: Solo Masculino, Dupla Mista, Quarteto...">
+                    <button onclick="adicionarCategoria()">Adicionar Categoria</button>
+                </div>
+                <div id="lista-categorias"></div>
+            </div>
+        </div>
+
+        <!-- GUIA CADASTRO -->
+        <div id="guia-cadastro" class="tab-content">
+            <div class="card">
+                <h2>Gerenciar Equipes</h2>
+                <input type="hidden" id="cad-id">
+                <div class="form-group">
+                    <label>Número da Equipe</label>
+                    <input type="number" id="cad-numero" placeholder="Ex: 101">
+                </div>
+                <div class="form-group">
+                    <label>Nome da Equipe</label>
+                    <input type="text" id="cad-nome" placeholder="Ex: Os Velozes">
+                </div>
+                <div class="form-group">
+                    <label>Categoria</label>
+                    <select id="cad-categoria">
+                        <option value="">-- Selecione a Categoria (Cadastre na aba Evento) --</option>
+                    </select>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                    <button id="btn-salvar-equipe" onclick="salvarEquipe()">Salvar Cadastro</button>
+                    <button id="btn-cancelar-edicao" onclick="limparFormEquipe()" style="display:none; background:var(--text-muted);">Cancelar</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;">
+                    <h2 style="margin: 0;">Equipes Cadastradas</h2>
+                    <div class="search-container">
+                        <input type="text" id="pesquisa-cadastro" placeholder="Pesquisar equipe por número ou nome..." onkeyup="filtrarCadastro()">
+                    </div>
+                    <button class="btn-warning" onclick="limparTemposRegistrados()">Zerar Tempos da Prova</button>
+                </div>
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Número</th>
+                                <th>Equipe</th>
+                                <th>Categoria</th>
+                                <th>Largada Prevista</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-equipes"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- GUIA TELÃO -->
+        <div id="guia-telao" class="tab-content">
+            <div class="relogio-container" id="relogio-sistema">00:00:00</div>
+            
+            <div class="card">
+                <h2>Próximas Equipes a Largar</h2>
+                <div class="largada-grid" id="grid-largada"></div>
+                <button class="btn-grande" onclick="largarEquipes()">Largar Equipes</button>
+            </div>
+
+            <div class="chegada-box">
+                <div class="form-group">
+                    <label style="color:var(--primary); font-weight:bold; font-size:1.2rem;">REGISTRO DE CHEGADA (Nº Equipe)</label>
+                    <input type="number" id="input-chegada" placeholder="Digite o Número e aperte ENTER" style="font-size: 1.5rem;" onkeypress="verificarEnterChegada(event)">
+                </div>
+                <button onclick="registrarChegada()" style="padding: 18px 30px; font-size: 1.2rem;">Registrar</button>
+            </div>
+        </div>
+
+        <!-- GUIA RELATÓRIO -->
+        <div id="guia-relatorio" class="tab-content">
+            <div class="card" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                <h2 style="margin: 0;">Ranking Oficial</h2>
+                <div class="search-container">
+                    <input type="text" id="pesquisa-relatorio" placeholder="Pesquisar no relatório por número ou nome..." onkeyup="filtrarRelatorio()">
+                </div>
+                <button onclick="gerarPDF()">Gerar Relatório em PDF</button>
+            </div>
+            
+            <div class="card">
+                <div style="overflow-x: auto;">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Ranking</th>
+                                <th>Número</th>
+                                <th>Equipe</th>
+                                <th>Categoria</th>
+                                <th>Status</th>
+                                <th>Hora Largada</th>
+                                <th>Hora Chegada</th>
+                                <th>Tempo Total</th>
+                                <th>Ações</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabela-relatorio"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- RODAPÉ DO SISTEMA -->
+        <footer class="site-footer">
+            Programa criado por Juvencio Jr - Todos os direitos reservados
+        </footer>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBa648qCHHhvALs_K5qgeyuYPtOFdGRRP4",
+            authDomain: "corrida-extreme-2026.firebaseapp.com",
+            databaseURL: "https://corrida-extreme-2026-default-rtdb.firebaseio.com",
+            projectId: "corrida-extreme-2026",
+            storageBucket: "corrida-extreme-2026.firebasestorage.app",
+            messagingSenderId: "950584976481",
+            appId: "1:950584976481:web:2c19463d9eb1380d48f620",
+            measurementId: "G-VPW10H47RZ"
+        };
+
+        let db = {
+            evento: {
+                nome: "",
+                qtdLargada: 5,
+                horaInicio: "08:00",
+                intervalo: 5, 
+                horaEspecial: "07:30",
+                categorias: [],
+                operadorAtivoId: null,
+                logoBase64: null // Nova propriedade para armazenar a logo
+            },
+            equipes: [],
+            operadores: []
+        };
+
+        let databaseRef = null;
+        let operadorSessaoAtual = null;
+
+        window.onload = () => {
+            iniciarRelogio();
+            
+            try {
+                firebase.initializeApp(firebaseConfig);
+                const database = firebase.database();
+                databaseRef = database.ref('magnetic_tempos');
+
+                databaseRef.on('value', (snapshot) => {
+                    const dataOnline = snapshot.val();
+                    if (dataOnline) processarCargaDeDados(dataOnline);
+                    document.getElementById('status-db').innerHTML = `<span class="dot"></span> Online`;
+                    atualizarInterface();
+                });
+            } catch (error) {
+                console.error("Erro no Firebase:", error);
+                document.getElementById('status-db').innerHTML = `<span class="dot" style="background-color: var(--warning); box-shadow: none;"></span> Off (Sem Firebase)`;
+                const salvo = localStorage.getItem('magnetic_db');
+                if (salvo) processarCargaDeDados(JSON.parse(salvo));
+                else processarCargaDeDados(db); 
+                atualizarInterface();
+            }
+        };
+
+        function processarCargaDeDados(data) {
+            db = data;
+            if (!db.evento) db.evento = { nome: "", qtdLargada: 5, horaInicio: "08:00", intervalo: 5, horaEspecial: "07:30", categorias: [], operadorAtivoId: null, logoBase64: null };
+            if (!db.evento.categorias) db.evento.categorias = [];
+            if (!db.equipes) db.equipes = [];
+            if (!db.operadores) db.operadores = [];
+
+            db.operadores.forEach(op => {
+                if(op.logado === undefined) op.logado = false;
+            });
+
+            document.getElementById('evt-nome').value = db.evento.nome || "";
+            document.getElementById('evt-qtd').value = db.evento.qtdLargada || 5;
+            document.getElementById('evt-hora').value = db.evento.horaInicio || "08:00";
+            document.getElementById('evt-intervalo').value = db.evento.intervalo || 5;
+            document.getElementById('evt-hora-especial').value = db.evento.horaEspecial || "07:30";
+        }
+
+        function salvarDadosOnline() {
+            if (databaseRef) {
+                databaseRef.set(db).catch(err => console.error("Erro ao salvar no Firebase:", err));
+            } else {
+                localStorage.setItem('magnetic_db', JSON.stringify(db));
+                atualizarInterface();
+            }
+        }
+
+        // --- SISTEMA DE LOGOMARCA ---
+        function processarLogoUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Limite de tamanho de 2MB para evitar travar o banco
+            if (file.size > 2 * 1024 * 1024) {
+                alert("A imagem é muito grande. Por favor, escolha uma imagem com menos de 2MB.");
+                document.getElementById('evt-logo-upload').value = '';
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                db.evento.logoBase64 = e.target.result;
+                salvarDadosOnline();
+                alert("Logomarca carregada com sucesso!");
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function removerLogo() {
+            if(confirm("Deseja realmente remover a logomarca do evento?")) {
+                db.evento.logoBase64 = null;
+                document.getElementById('evt-logo-upload').value = '';
+                salvarDadosOnline();
+            }
+        }
+
+        function atualizarLogos() {
+            const loginLogo = document.getElementById('login-logo');
+            const loginLogoContainer = document.getElementById('login-logo-container');
+            const headerLogo = document.getElementById('header-logo');
+            const headerLogoContainer = document.getElementById('header-logo-container');
+            const btnRemoverLogo = document.getElementById('btn-remover-logo');
+
+            if (db.evento && db.evento.logoBase64) {
+                loginLogo.src = db.evento.logoBase64;
+                loginLogoContainer.style.display = 'block';
+
+                headerLogo.src = db.evento.logoBase64;
+                headerLogoContainer.style.display = 'block';
+                
+                btnRemoverLogo.style.display = 'inline-block';
+            } else {
+                loginLogo.src = '';
+                loginLogoContainer.style.display = 'none';
+
+                headerLogo.src = '';
+                headerLogoContainer.style.display = 'none';
+                
+                btnRemoverLogo.style.display = 'none';
+            }
+        }
+
+        // ================= SISTEMA DE LOGIN EXTREME =================
+        function verificarEnterLogin(e) {
+            if (e.key === 'Enter') efetuarLogin();
+        }
+
+        function efetuarLogin() {
+            const codigoDigitado = document.getElementById('input-codigo-login').value.trim();
+            if (!codigoDigitado) return alert("Por favor, digite o código do operador.");
+
+            const op = db.operadores.find(o => o.codigo === codigoDigitado);
+
+            if (!op) return alert("Código inválido ou operador não cadastrado.");
+
+            if (op.logado) {
+                return alert("Acesso Negado: Este operador já está logado no sistema em outra tela.");
+            }
+
+            op.logado = true;
+            operadorSessaoAtual = op;
+            db.evento.operadorAtivoId = op.id; 
+
+            salvarDadosOnline();
+
+            document.getElementById('tela-login-container').style.display = 'none';
+            document.getElementById('sistema-principal').style.display = 'flex';
+            
+            document.getElementById('input-codigo-login').value = '';
+            atualizarOperadorInfo();
+        }
+
+        function fazerLogout() {
+            if (operadorSessaoAtual) {
+                const op = db.operadores.find(o => o.id === operadorSessaoAtual.id);
+                if (op) op.logado = false;
+                operadorSessaoAtual = null;
+                salvarDadosOnline();
+            }
+
+            document.getElementById('sistema-principal').style.display = 'none';
+            document.getElementById('tela-login-container').style.display = 'flex';
+        }
+
+        window.addEventListener('beforeunload', function (e) {
+            if (operadorSessaoAtual) {
+                const op = db.operadores.find(o => o.id === operadorSessaoAtual.id);
+                if (op) {
+                    op.logado = false;
+                    if (databaseRef) databaseRef.set(db);
+                }
+            }
+        });
+
+        function liberarAcessoOperador(id) {
+            const op = db.operadores.find(o => o.id == id);
+            if(op && confirm(`Deseja forçar a desconexão do operador ${op.nome}?`)) {
+                op.logado = false;
+                salvarDadosOnline();
+                alert("Sessão do operador liberada com sucesso.");
+            }
+        }
+
+        // --- NAVEGAÇÃO DE GUIAS ---
+        function abrirGuia(evt, guiaId) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById(guiaId).classList.add('active');
+            evt.currentTarget.classList.add('active');
+            
+            if(guiaId === 'guia-telao') prepararTelao();
+            if(guiaId === 'guia-relatorio') {
+                document.getElementById('pesquisa-relatorio').value = ''; 
+                renderizarRelatorio();
+            }
+            if(guiaId === 'guia-cadastro') {
+                document.getElementById('pesquisa-cadastro').value = ''; 
+                renderizarTabelaEquipes();
+            }
+        }
+
+        function converterParaMsHoje(horaStr) {
+            let partes = horaStr.split(':');
+            let d = new Date();
+            d.setHours(parseInt(partes[0] || 0), parseInt(partes[1] || 0), parseInt(partes[2] || 0), 0);
+            return d.getTime();
+        }
+
+        // --- GERENCIAMENTO DE OPERADORES ---
+        function salvarOperador() {
+            let id = document.getElementById('op-id').value;
+            let nome = document.getElementById('op-nome').value.trim();
+            let codigo = document.getElementById('op-codigo').value.trim();
+
+            if(!nome || !codigo) return alert("Preencha o nome e o código do operador!");
+
+            if(id) {
+                let op = db.operadores.find(o => o.id == id);
+                if(op) { op.nome = nome; op.codigo = codigo; }
+            } else {
+                let novoId = Date.now();
+                db.operadores.push({ id: novoId, nome: nome, codigo: codigo, logado: false });
+            }
+
+            limparFormOperador();
+            salvarDadosOnline();
+        }
+
+        function limparFormOperador() {
+            document.getElementById('op-id').value = '';
+            document.getElementById('op-nome').value = '';
+            document.getElementById('op-codigo').value = '';
+            document.getElementById('btn-salvar-op').innerText = 'Salvar Operador';
+            document.getElementById('btn-cancelar-op').style.display = 'none';
+        }
+
+        function editarOperador(id) {
+            let op = db.operadores.find(o => o.id == id);
+            if(!op) return;
+            document.getElementById('op-id').value = op.id;
+            document.getElementById('op-nome').value = op.nome;
+            document.getElementById('op-codigo').value = op.codigo;
+            document.getElementById('btn-salvar-op').innerText = 'Alterar Cadastro';
+            document.getElementById('btn-cancelar-op').style.display = 'inline-block';
+        }
+
+        function excluirOperador(id) {
+            if(confirm("Tem certeza que deseja excluir este operador?")) {
+                db.operadores = db.operadores.filter(o => o.id != id);
+                if(db.evento.operadorAtivoId == id) db.evento.operadorAtivoId = null;
+                salvarDadosOnline();
+            }
+        }
+
+        function renderizarOperadores() {
+            const tbody = document.getElementById('tabela-operadores');
+            tbody.innerHTML = '';
+            if(!db.operadores) return;
+
+            db.operadores.forEach(op => {
+                let statusSessao = op.logado 
+                    ? `<span style="color: var(--danger); font-weight: bold;">Logado (Sessão Ativa)</span>` 
+                    : `<span style="color: var(--text-muted);">Desconectado</span>`;
+                
+                let btnLiberar = op.logado 
+                    ? `<button class="btn-warning" style="padding: 5px 10px; font-size: 0.8rem;" onclick="liberarAcessoOperador(${op.id})">Liberar Acesso</button>` 
+                    : '';
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${op.nome}</td>
+                        <td>${op.codigo}</td>
+                        <td>${statusSessao}</td>
+                        <td>
+                            <div class="acoes-tabela">
+                                ${btnLiberar}
+                                <button style="padding: 5px 10px; font-size: 0.8rem;" onclick="editarOperador(${op.id})">Alterar</button>
+                                <button class="btn-danger" style="padding: 5px 10px; font-size: 0.8rem;" onclick="excluirOperador(${op.id})">Excluir</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        // --- GUIA EVENTO E CATEGORIAS ---
+        function salvarEvento() {
+            db.evento.nome = document.getElementById('evt-nome').value.trim();
+            db.evento.qtdLargada = parseInt(document.getElementById('evt-qtd').value);
+            db.evento.horaInicio = document.getElementById('evt-hora').value;
+            db.evento.intervalo = parseInt(document.getElementById('evt-intervalo').value);
+            db.evento.horaEspecial = document.getElementById('evt-hora-especial').value;
+            
+            calcularPrevisoes();
+            salvarDadosOnline();
+            alert('Configurações salvas e sincronizadas!');
+        }
+
+        function adicionarCategoria() {
+            const input = document.getElementById('evt-nova-categoria');
+            const novaCat = input.value.trim();
+            if (!novaCat) return;
+            
+            if (!db.evento.categorias) db.evento.categorias = [];
+            const existe = db.evento.categorias.find(c => c.toLowerCase() === novaCat.toLowerCase());
+            if(existe) return alert("Esta categoria já existe!");
+
+            db.evento.categorias.push(novaCat);
+            input.value = '';
+            salvarDadosOnline();
+        }
+
+        function removerCategoria(index) {
+            if(confirm("Tem certeza que deseja remover esta categoria?")) {
+                db.evento.categorias.splice(index, 1);
+                salvarDadosOnline();
+            }
+        }
+
+        function renderizarCategorias() {
+            const container = document.getElementById('lista-categorias');
+            container.innerHTML = '';
+            
+            if(db.evento.categorias && db.evento.categorias.length > 0) {
+                db.evento.categorias.forEach((cat, index) => {
+                    container.innerHTML += `
+                        <div class="categoria-item">
+                            <span>${cat}</span>
+                            <button class="btn-danger" style="padding: 5px 10px; font-size: 0.8rem;" onclick="removerCategoria(${index})">Remover</button>
+                        </div>
+                    `;
+                });
+            } else {
+                container.innerHTML = '<p style="color: var(--text-muted); font-style: italic;">Nenhuma categoria cadastrada.</p>';
+            }
+
+            const selectCad = document.getElementById('cad-categoria');
+            const valorAtual = selectCad.value; 
+            
+            selectCad.innerHTML = '<option value="">-- Selecione a Categoria --</option>';
+            if(db.evento.categorias) {
+                db.evento.categorias.forEach(cat => {
+                    selectCad.innerHTML += `<option value="${cat}">${cat}</option>`;
+                });
+            }
+            selectCad.value = valorAtual; 
+        }
+
+        function calcularPrevisoes() {
+            db.equipes.sort((a, b) => {
+                let aEsp = a.isEspecial ? 1 : 0;
+                let bEsp = b.isEspecial ? 1 : 0;
+                if(aEsp !== bEsp) return bEsp - aEsp;
+                return a.id - b.id;
+            });
+            
+            const [horaStr, minStr] = db.evento.horaInicio.split(':');
+            let baseMinutosNormal = parseInt(horaStr) * 60 + parseInt(minStr);
+
+            const [horaEspStr, minEspStr] = db.evento.horaEspecial.split(':');
+            let baseMinutosEspecial = parseInt(horaEspStr) * 60 + parseInt(minEspStr);
+
+            let ordemNormal = 0;
+            let ordemEspecial = 0;
+
+            db.equipes.forEach((eq) => {
+                if(eq.status === 'PENDENTE' || eq.status === 'NA_TELA' || !eq.horaLargadaReal) {
+                    if (eq.isEspecial) {
+                        let bloco = Math.floor(ordemEspecial / db.evento.qtdLargada);
+                        let minTotal = baseMinutosEspecial + (bloco * db.evento.intervalo);
+                        let h = Math.floor(minTotal / 60) % 24;
+                        let m = minTotal % 60;
+                        eq.horaLargadaPrevista = `${pad(h)}:${pad(m)}`;
+                        ordemEspecial++;
+                    } else {
+                        let bloco = Math.floor(ordemNormal / db.evento.qtdLargada);
+                        let minTotal = baseMinutosNormal + (bloco * db.evento.intervalo);
+                        let h = Math.floor(minTotal / 60) % 24;
+                        let m = minTotal % 60;
+                        eq.horaLargadaPrevista = `${pad(h)}:${pad(m)}`;
+                        ordemNormal++;
+                    }
+                }
+            });
+        }
+
+        // --- GUIA CADASTRO ---
+        function salvarEquipe() {
+            const id = document.getElementById('cad-id').value;
+            const numero = document.getElementById('cad-numero').value;
+            const nome = document.getElementById('cad-nome').value.trim();
+            const categoria = document.getElementById('cad-categoria').value;
+
+            if (!numero || !nome) return alert("Preencha número e nome da equipe!");
+
+            if (id) {
+                const eq = db.equipes.find(e => e.id == id);
+                if(eq) { 
+                    eq.numero = numero; 
+                    eq.nome = nome; 
+                    eq.categoria = categoria; 
+                }
+            } else {
+                if (db.equipes.find(e => e.numero == numero)) return alert("Número já cadastrado!");
+                db.equipes.push({
+                    id: Date.now(),
+                    numero: numero,
+                    nome: nome,
+                    categoria: categoria,
+                    status: 'PENDENTE',
+                    horaLargadaPrevista: '00:00',
+                    horaLargadaRealMs: null,
+                    horaChegadaMs: null,
+                    tempoTotalMs: 0,
+                    isEspecial: false
+                });
+            }
+            limparFormEquipe();
+            calcularPrevisoes();
+            salvarDadosOnline();
+        }
+
+        function limparFormEquipe() {
+            document.getElementById('cad-id').value = '';
+            document.getElementById('cad-numero').value = '';
+            document.getElementById('cad-nome').value = '';
+            document.getElementById('cad-categoria').value = '';
+            document.getElementById('btn-salvar-equipe').innerText = 'Salvar Cadastro';
+            document.getElementById('btn-cancelar-edicao').style.display = 'none';
+        }
+
+        function editarEquipe(id) {
+            const eq = db.equipes.find(e => e.id == id);
+            if(!eq) return;
+            document.getElementById('cad-id').value = eq.id;
+            document.getElementById('cad-numero').value = eq.numero;
+            document.getElementById('cad-nome').value = eq.nome;
+            document.getElementById('cad-categoria').value = eq.categoria || "";
+            document.getElementById('btn-salvar-equipe').innerText = 'Alterar Cadastro';
+            document.getElementById('btn-cancelar-edicao').style.display = 'inline-block';
+            window.scrollTo(0, 0);
+        }
+
+        function excluirEquipe(id) {
+            if(confirm("Tem certeza que deseja excluir esta equipe?")) {
+                db.equipes = db.equipes.filter(e => e.id != id);
+                calcularPrevisoes();
+                salvarDadosOnline();
+            }
+        }
+        
+        function limparTemposRegistrados() {
+            if(confirm("ATENÇÃO: Isso apagará TODOS os tempos de largada e chegada. Deseja realmente continuar?")) {
+                db.equipes.forEach(eq => {
+                    eq.status = 'PENDENTE';
+                    eq.horaLargadaRealMs = null;
+                    eq.horaChegadaMs = null;
+                    eq.tempoTotalMs = 0;
+                });
+                calcularPrevisoes();
+                salvarDadosOnline();
+                alert("Todos os tempos foram zerados.");
+            }
+        }
+
+        function toggleLargadaEspecial(id) {
+            if (!db.evento.horaEspecial) return alert("Configure primeiro o Horário da Largada Especial na guia Evento!");
+            const eq = db.equipes.find(e => e.id == id);
+            if(eq) {
+                eq.isEspecial = !eq.isEspecial;
+                calcularPrevisoes();
+                salvarDadosOnline();
+            }
+        }
+
+        function renderizarTabelaEquipes() {
+            const tbody = document.getElementById('tabela-equipes');
+            tbody.innerHTML = '';
+            if(!db.equipes) return;
+            
+            db.equipes.forEach(eq => {
+                let espClass = eq.isEspecial ? "text-especial" : "";
+                tbody.innerHTML += `
+                    <tr class="${espClass}">
+                        <td>${eq.numero}</td>
+                        <td>${eq.nome}</td>
+                        <td>${eq.categoria || '-'}</td>
+                        <td>${eq.horaLargadaPrevista}</td>
+                        <td>
+                            <div class="acoes-tabela">
+                                <button class="btn-special" style="padding: 5px 10px; font-size: 0.8rem;" onclick="toggleLargadaEspecial(${eq.id})">
+                                    ${eq.isEspecial ? 'Remover Especial' : 'Largada Especial'}
+                                </button>
+                                <button onclick="editarEquipe(${eq.id})" style="padding: 5px 10px; font-size: 0.8rem;">Alterar</button>
+                                <button class="btn-danger" onclick="excluirEquipe(${eq.id})" style="padding: 5px 10px; font-size: 0.8rem;">Excluir</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+            filtrarCadastro();
+        }
+
+        function filtrarCadastro() {
+            const input = document.getElementById('pesquisa-cadastro')?.value.toLowerCase() || "";
+            const trs = document.querySelectorAll('#tabela-equipes tr');
+            trs.forEach(tr => {
+                const numero = tr.cells[0].innerText.toLowerCase();
+                const nome = tr.cells[1].innerText.toLowerCase();
+                if (numero.includes(input) || nome.includes(input)) tr.style.display = '';
+                else tr.style.display = 'none';
+            });
+        }
+
+        // --- GUIA TELÃO ---
+        function iniciarRelogio() {
+            setInterval(() => {
+                const now = new Date();
+                document.getElementById('relogio-sistema').innerText = 
+                    `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+            }, 1000);
+        }
+
+        function prepararTelao() {
+            if(!db.equipes) return;
+            let naTela = db.equipes.filter(e => e.status === 'NA_TELA');
+            
+            if (naTela.length === 0) {
+                let pendentes = db.equipes.filter(e => e.status === 'PENDENTE');
+                if (pendentes.length > 0) {
+                    let isFirstSpecial = pendentes[0].isEspecial;
+                    let carregar = [];
+
+                    for (let i = 0; i < pendentes.length; i++) {
+                        if (carregar.length >= db.evento.qtdLargada) break;
+                        if (pendentes[i].isEspecial === isFirstSpecial) {
+                            carregar.push(pendentes[i]);
+                        } else break;
+                    }
+
+                    carregar.forEach(eq => eq.status = 'NA_TELA');
+                    naTela = carregar;
+                    salvarDadosOnline(); 
+                }
+            }
+            renderizarGridLargada(naTela);
+        }
+
+        function renderizarGridLargada(equipesNaTela) {
+            const grid = document.getElementById('grid-largada');
+            grid.innerHTML = '';
+            
+            if(equipesNaTela.length === 0) {
+                grid.innerHTML = '<p style="color: var(--text-muted);">Nenhuma equipe aguardando largada.</p>';
+                return;
+            }
+
+            equipesNaTela.forEach(eq => {
+                let espClass = eq.isEspecial ? "text-especial" : "";
+                let catLabel = eq.categoria ? `<span class="cat-label">${eq.categoria}</span>` : "";
+                
+                grid.innerHTML += `
+                    <div class="equipe-card">
+                        <h2 class="${espClass}">Nº ${eq.numero}</h2>
+                        <p class="${espClass}">${eq.nome}</p>
+                        ${catLabel}
+                        <button class="btn-danger" onclick="marcarNaoLargouTelao(${eq.id})" style="width:100%; font-size: 0.9rem;">Não Largou</button>
+                    </div>
+                `;
+            });
+        }
+
+        function marcarNaoLargouTelao(id) {
+            const eq = db.equipes.find(e => e.id == id);
+            if(eq) {
+                eq.status = 'NAO_LARGOU';
+                salvarDadosOnline();
+            }
+        }
+
+        function largarEquipes() {
+            let naTela = db.equipes.filter(e => e.status === 'NA_TELA');
+            if (naTela.length === 0) return alert("Não há equipes aguardando no telão para largar.");
+
+            const horaExata = Date.now();
+            naTela.forEach(eq => {
+                eq.status = 'CORRENDO';
+                eq.horaLargadaRealMs = horaExata;
+            });
+            salvarDadosOnline();
+        }
+
+        function verificarEnterChegada(e) {
+            if (e.key === 'Enter') registrarChegada();
+        }
+
+        function registrarChegada() {
+            const num = document.getElementById('input-chegada').value.trim();
+            if(!num) return;
+
+            const eq = db.equipes.find(e => e.numero == num);
+            if (!eq) return alert("Equipe não encontrada!");
+            
+            if (eq.status !== 'CORRENDO') {
+                return alert(`A equipe ${num} não está correndo atualmente (Status: ${eq.status}).`);
+            }
+
+            eq.horaChegadaMs = Date.now();
+            eq.tempoTotalMs = eq.horaChegadaMs - eq.horaLargadaRealMs;
+            eq.status = 'CONCLUIDO';
+            
+            document.getElementById('input-chegada').value = '';
+            salvarDadosOnline();
+            alert(`Chegada registrada! Equipe: ${eq.nome}\nTempo: ${msToTime(eq.tempoTotalMs)}`);
+        }
+
+        // --- GUIA RELATÓRIO ---
+        function renderizarRelatorio() {
+            const tbody = document.getElementById('tabela-relatorio');
+            tbody.innerHTML = '';
+            if(!db.equipes) return;
+
+            let copia = [...db.equipes];
+            copia.sort((a, b) => {
+                let pesoA = getPesoStatus(a.status);
+                let pesoB = getPesoStatus(b.status);
+                if (pesoA !== pesoB) return pesoA - pesoB;
+                if (a.status === 'CONCLUIDO') return a.tempoTotalMs - b.tempoTotalMs;
+                return 0;
+            });
+
+            copia.forEach((eq, index) => {
+                let statusLabel = "";
+                if(eq.status === 'CONCLUIDO') statusLabel = "Aprovado";
+                else if(eq.status === 'NAO_LARGOU') statusLabel = "Não Largou";
+                else if(eq.status === 'DESCLASSIFICADO') statusLabel = "Desclassificado";
+                else statusLabel = eq.status.replace('_', ' ');
+
+                let rowClass = "";
+                if (eq.status === 'DESCLASSIFICADO' || eq.status === 'NAO_LARGOU') rowClass += "text-danger ";
+                if (eq.isEspecial) rowClass += "text-especial ";
+
+                let botoesHtml = `<div class="acoes-relatorio">`;
+                if (eq.status === 'DESCLASSIFICADO') {
+                    botoesHtml += `<button class="btn-info" style="padding: 5px 8px; font-size: 0.8rem;" onclick="reclassificar(${eq.id})">Reclassificar</button>`;
+                } else {
+                    botoesHtml += `<button class="btn-danger" style="padding: 5px 8px; font-size: 0.8rem;" onclick="desclassificar(${eq.id})">Desclassificar</button>`;
+                    if (eq.status !== 'NAO_LARGOU') {
+                        botoesHtml += `<button class="btn-warning" style="padding: 5px 8px; font-size: 0.8rem;" onclick="marcarNaoLargouRelatorio(${eq.id})">Não Largou</button>`;
+                    }
+                    if (eq.horaLargadaRealMs && eq.status !== 'NAO_LARGOU') {
+                        botoesHtml += `<button class="btn-edit" style="padding: 5px 8px; font-size: 0.8rem;" onclick="alterarTempoChegada(${eq.id})">Editar Chegada</button>`;
+                    }
+                }
+                botoesHtml += `</div>`;
+
+                tbody.innerHTML += `
+                    <tr class="${rowClass}">
+                        <td>${index + 1}º</td>
+                        <td>${eq.numero}</td>
+                        <td>${eq.nome}</td>
+                        <td>${eq.categoria || '-'}</td>
+                        <td><b>${statusLabel}</b></td>
+                        <td>${eq.horaLargadaRealMs ? formatHoraMs(eq.horaLargadaRealMs) : '--:--:--'}</td>
+                        <td>${eq.horaChegadaMs ? formatHoraMs(eq.horaChegadaMs) : '--:--:--'}</td>
+                        <td>${eq.tempoTotalMs > 0 ? msToTime(eq.tempoTotalMs) : '--:--:--'}</td>
+                        <td>${botoesHtml}</td>
+                    </tr>
+                `;
+            });
+            filtrarRelatorio();
+        }
+
+        function alterarTempoChegada(id) {
+            const eq = db.equipes.find(e => e.id == id);
+            if(!eq) return;
+            if(!eq.horaLargadaRealMs) return alert("Esta equipe ainda não largou!");
+
+            let horaAtualFormatada = eq.horaChegadaMs ? formatHoraMs(eq.horaChegadaMs) : "";
+            let novaHora = prompt("Digite o NOVO HORÁRIO DE CHEGADA no formato HH:MM:SS\nEquipe: " + eq.nome, horaAtualFormatada);
+
+            if(novaHora === null) return; 
+
+            if(!/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9]$/.test(novaHora.trim())) {
+                return alert("Formato inválido! Use exatamente o formato HH:MM:SS");
+            }
+
+            eq.horaChegadaMs = converterParaMsHoje(novaHora.trim());
+            eq.tempoTotalMs = eq.horaChegadaMs - eq.horaLargadaRealMs;
+
+            if(eq.tempoTotalMs < 0) alert("Atenção: Horário de chegada é ANTERIOR ao horário da largada!");
+
+            eq.status = 'CONCLUIDO';
+            salvarDadosOnline();
+        }
+
+        function filtrarRelatorio() {
+            const input = document.getElementById('pesquisa-relatorio')?.value.toLowerCase() || "";
+            const trs = document.querySelectorAll('#tabela-relatorio tr');
+            trs.forEach(tr => {
+                const numero = tr.cells[1].innerText.toLowerCase();
+                const nome = tr.cells[2].innerText.toLowerCase();
+                if (numero.includes(input) || nome.includes(input)) tr.style.display = '';
+                else tr.style.display = 'none';
+            });
+        }
+
+        function desclassificar(id) {
+            if(confirm("Deseja realmente desclassificar esta equipe?")) {
+                const eq = db.equipes.find(e => e.id == id);
+                if(eq) {
+                    eq.status = 'DESCLASSIFICADO';
+                    salvarDadosOnline();
+                }
+            }
+        }
+
+        function reclassificar(id) {
+            if(confirm("Deseja reclassificar esta equipe e cancelar a desclassificação?")) {
+                const eq = db.equipes.find(e => e.id == id);
+                if(eq) {
+                    if(eq.horaChegadaMs) eq.status = 'CONCLUIDO';
+                    else if(eq.horaLargadaRealMs) eq.status = 'CORRENDO';
+                    else eq.status = 'PENDENTE';
+                    salvarDadosOnline();
+                }
+            }
+        }
+
+        function marcarNaoLargouRelatorio(id) {
+            if(confirm("Deseja marcar esta equipe como NÃO LARGOU?")) {
+                const eq = db.equipes.find(e => e.id == id);
+                if(eq) {
+                    eq.status = 'NAO_LARGOU';
+                    eq.horaLargadaRealMs = null;
+                    eq.horaChegadaMs = null;
+                    eq.tempoTotalMs = 0;
+                    salvarDadosOnline();
+                }
+            }
+        }
+
+        function getPesoStatus(status) {
+            if(status === 'CONCLUIDO') return 1;
+            if(status === 'CORRENDO') return 2;
+            if(status === 'NA_TELA' || status === 'PENDENTE') return 3;
+            if(status === 'NAO_LARGOU') return 4;
+            if(status === 'DESCLASSIFICADO') return 5;
+            return 99;
+        }
+
+        // --- FUNÇÕES DE PDF E BACKUP ---
+        function gerarPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            doc.setFontSize(18);
+            const tituloRelatorio = db.evento.nome ? `Relatório Oficial - ${db.evento.nome}` : "Relatório Oficial - Controle de Tempos";
+            doc.text(tituloRelatorio, 14, 20);
+            
+            const tbody = document.getElementById('tabela-relatorio');
+            const rows = Array.from(tbody.querySelectorAll('tr'))
+                .filter(tr => tr.style.display !== 'none')
+                .map(tr => {
+                    const cols = tr.querySelectorAll('td');
+                    let nomeTabela = cols[2].innerText;
+                    if(tr.classList.contains('text-especial')) nomeTabela += " (Esp)";
+                    
+                    return [cols[0].innerText, cols[1].innerText, nomeTabela, cols[3].innerText, cols[4].innerText, cols[5].innerText, cols[6].innerText, cols[7].innerText];
+                });
+
+            doc.autoTable({
+                startY: 30,
+                head: [['Ranking', 'Nº', 'Equipe', 'Categoria', 'Status', 'Largada', 'Chegada', 'Tempo']],
+                body: rows,
+                theme: 'striped',
+                headStyles: { fillColor: [0, 204, 106] },
+                margin: { bottom: 20 },
+                styles: { fontSize: 9 }
+            });
+
+            const pageCount = doc.internal.getNumberOfPages();
+            for (let i = 1; i <= pageCount; i++) {
+                doc.setPage(i);
+                doc.setFontSize(9);
+                doc.setTextColor(150); 
+                const text = "Programa criado por Juvencio Jr - Todos os direitos reservados";
+                const pageWidth = doc.internal.pageSize.width;
+                const pageHeight = doc.internal.pageSize.height;
+                doc.text(text, pageWidth / 2, pageHeight - 10, { align: 'center' });
+            }
+            doc.save("ranking_oficial.pdf");
+        }
+
+        function exportarBackup() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db));
+            const downloadAnchorNode = document.createElement('a');
+            downloadAnchorNode.setAttribute("href",     dataStr);
+            downloadAnchorNode.setAttribute("download", "backup_magnetic_tempos_" + Date.now() + ".json");
+            document.body.appendChild(downloadAnchorNode);
+            downloadAnchorNode.click();
+            downloadAnchorNode.remove();
+        }
+
+        // --- UTILITÁRIOS ---
+        function atualizarInterface() {
+            atualizarTitulo();
+            atualizarOperadorInfo();
+            renderizarOperadores();
+            renderizarCategorias(); 
+            renderizarTabelaEquipes();
+            atualizarLogos(); // Atualiza a renderização das logomarcas
+            if(document.getElementById('guia-telao').classList.contains('active')) prepararTelao();
+            if(document.getElementById('guia-relatorio').classList.contains('active')) renderizarRelatorio();
+        }
+
+        function atualizarTitulo() {
+            const tituloMain = document.getElementById('main-title');
+            if(db.evento && db.evento.nome) {
+                tituloMain.innerText = "CONTROLE DE TEMPOS - " + db.evento.nome.toUpperCase();
+            } else {
+                tituloMain.innerText = "CONTROLE DE TEMPOS";
+            }
+        }
+
+        function atualizarOperadorInfo() {
+            const displayOpNome = document.getElementById('nome-operador-header');
+            const btnLogout = document.getElementById('btn-logout-header');
+            
+            if(operadorSessaoAtual) {
+                displayOpNome.innerText = `Operador Ativo: ${operadorSessaoAtual.nome} (${operadorSessaoAtual.codigo})`;
+                btnLogout.style.display = 'block';
+            } else {
+                displayOpNome.innerText = "Operador: Não definido";
+                btnLogout.style.display = 'none';
+            }
+        }
+
+        function pad(num) { return num.toString().padStart(2, '0'); }
+
+        function formatHoraMs(ms) {
+            const d = new Date(ms);
+            return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+        }
+
+        function msToTime(duration) {
+            let seconds = Math.floor((duration / 1000) % 60);
+            let minutes = Math.floor((duration / (1000 * 60)) % 60);
+            let hours = Math.floor((duration / (1000 * 60 * 60)) % 24);
+            return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+        }
+    </script>
+</body>
+</html>
